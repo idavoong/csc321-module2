@@ -1,5 +1,5 @@
-from Crypto.Cipher import AES
-from Crypto.Random import get_random_bytes
+from Crypto.Cipher import AES # type: ignore
+from Crypto.Random import get_random_bytes # type: ignore
 
 
 # generate key or iv
