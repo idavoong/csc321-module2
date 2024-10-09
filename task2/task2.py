@@ -24,10 +24,12 @@ def submit(input, key, iv):
     prepend = "userid=456;userdata="
     append = ";session-id=31337"
     string = prepend + input + append # prepend and append strings to input
+    print("ORIGINAL: ", string)
     encoded_data = urllib.parse.quote(string) # URL encode ; and =
-    print("ORIGINAL: ", encoded_data)
+    print("ENCODED: ", encoded_data[32:])
 
     padded_data = pad(encoded_data) # pad data
+    # padded_data = pad(string)
     cipher = AES.new(key, AES.MODE_CBC, iv)
     encrypted = cipher.encrypt(padded_data) # encrypt using AES-128-CBC
 
@@ -50,44 +52,32 @@ def verify(ciphertext, key, iv):
         return False
 
 
-def xor_blocks(block, prev_block):
-    return bytes([x ^ y for x, y in zip(block, prev_block)])
+def attack(ciphertext):
+    modified_ciphertext = bytearray(ciphertext)
+    target = ["t", "e", "s", "t", "t", "m", "e", "s", "s", "a", "g", "e", "s", "s", "s", "s", "s", "s", "s", "s", "s", "s"]
+    inject = [";", "a", "d", "m", "i", "n", "=", "t", "r", "u", "e", ";"] 
 
+    print(target[32-31] + " " + inject[32-32])
+    for i in range(32, 33):
+        modified_ciphertext[i] ^= ord(target[i-31]) ^ ord(inject[i-32])
 
-# def attack(ciphertext, injection):
-#     # result = []
+    # prev = modified_ciphertext[16:32]
+    # cur = modified_ciphertext[32:48]
+    # block = bytes([x ^ y for x, y in zip(prev, cur)])
+    # ciphertext = ciphertext[:32] + block + ciphertext[48:]
 
-#     modified_ciphertext = bytearray(ciphertext)
-
-#     modified_ciphertext[4] ^= ord("@") ^ ord(";")
-#     modified_ciphertext[10] ^= ord("$") ^ ord("=")
-#     modified_ciphertext[15] ^= ord("*") ^ ord(";")
-
-#     target = bytes(injection, 'utf-8')
-
-#     for i in range(len(target)):
-#         modified_ciphertext[i] ^= ord("?") ^ target[i]
-
-#     return bytes(modified_ciphertext)
-
-
-def attack(ciphertext ,injection, key, iv):
-    prepend = "userid=456;userdata="
-    prepend_len = len(prepend)
-    target = prepend_len // 16
+    return bytes(modified_ciphertext)
 
 
 if __name__ == '__main__':
     key = gen_key_iv()
     iv = gen_key_iv()
-    ciphertext = submit("test message", key, iv)
-    print("CIPHERTEXT: ", ciphertext)
+    ciphertext = submit("testtmessagessssssssss", key, iv)
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    print("CIPHERTEXT: ", cipher.decrypt(ciphertext))
 
-    result = verify(ciphertext, key, iv)
+
+    modify = attack(ciphertext)
+
+    result = verify(modify, key, iv)
     print("Admin access granted: ", result)
-    # modified_ciphertext = attack(ciphertext, ";admin=true;")
-    # is_admin = verify(modified_ciphertext, key, iv)
-    # print(verify(ciphertext, key, iv))
-    # print(attack)
-    # print(modified_ciphertext)
-    # print(f"Admin access granted: {is_admin}")
