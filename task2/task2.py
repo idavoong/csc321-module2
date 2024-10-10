@@ -1,70 +1,61 @@
-from Crypto.Cipher import AES # type: ignore
-from Crypto.Random import get_random_bytes # type: ignore
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
 import urllib.parse
 
 
 # generate key or iv
-def gen_key_iv():
+def gen_key_iv():       #done
     return get_random_bytes(16)
 
 
 # add padding to data so that its length is a multiple of 16 (bytes)
-def pad(data):
+def pad(data):      #done
     padding = 16 - (len(data) % 16)
-    return bytes(data, encoding='utf-8') + bytes([padding] * padding)
-
+    return data + bytes([padding] * padding)
 
 # remove padding from data
-def unpad(data):
+def unpad(data):        #done
     padding = data[-1]
     return data[:-padding]
 
-
-def submit(input, key, iv):
+# submit user input for encryption
+def submit(input, key, iv):     #done
     prepend = "userid=456;userdata="
     append = ";session-id=31337"
-    string = prepend + input + append # prepend and append strings to input
-    print("ORIGINAL: ", string)
-    encoded_data = urllib.parse.quote(string) # URL encode ; and =
-    print("ENCODED: ", encoded_data[32:])
 
-    padded_data = pad(encoded_data) # pad data
-    # padded_data = pad(string)
+    string = prepend + input + append # prepend and append strings to input
+
     cipher = AES.new(key, AES.MODE_CBC, iv)
+
+    padded_data = pad(string.encode('utf-8')) # pad data
+
     encrypted = cipher.encrypt(padded_data) # encrypt using AES-128-CBC
 
     return encrypted
 
 
 def verify(ciphertext, key, iv):
+    '''Decrypts ct, check admin and return result'''
     cipher = AES.new(key, AES.MODE_CBC, iv)
-    decrypted = cipher.decrypt(ciphertext)
-    unpadded_data = unpad(decrypted)
-    decode = urllib.parse.unquote(unpadded_data)
 
-    pattern = b";admin=true;"
+    decrypted_data = unpad(cipher.decrypt(ciphertext))
 
-    print("DECRPYTED: ", decode)
+    decoded = decrypted_data[16:].decode('utf-8')
 
-    if pattern in unpadded_data:
-        return True
-    else:
-        return False
+    print(f"Decrypted data: {decoded}")
+
+    pattern = ";admin=true;"
+
+    return pattern in decoded
 
 
-def attack(ciphertext):
+def attack(ciphertext):     #done
+    # convert ct to mutuable bytearray
     modified_ciphertext = bytearray(ciphertext)
-    target = ["t", "e", "s", "t", "t", "m", "e", "s", "s", "a", "g", "e", "s", "s", "s", "s", "s", "s", "s", "s", "s", "s"]
-    inject = [";", "a", "d", "m", "i", "n", "=", "t", "r", "u", "e", ";"] 
 
-    print(target[32-31] + " " + inject[32-32])
-    for i in range(32, 33):
-        modified_ciphertext[i] ^= ord(target[i-31]) ^ ord(inject[i-32])
-
-    # prev = modified_ciphertext[16:32]
-    # cur = modified_ciphertext[32:48]
-    # block = bytes([x ^ y for x, y in zip(prev, cur)])
-    # ciphertext = ciphertext[:32] + block + ciphertext[48:]
+    modified_ciphertext[4] ^= ord('@') ^ ord(';')
+    modified_ciphertext[10] ^= ord('$') ^ ord('=')
+    modified_ciphertext[15] ^= ord('*') ^ ord(';')
 
     return bytes(modified_ciphertext)
 
@@ -72,12 +63,15 @@ def attack(ciphertext):
 if __name__ == '__main__':
     key = gen_key_iv()
     iv = gen_key_iv()
-    ciphertext = submit("testtmessagessssssssss", key, iv)
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    print("CIPHERTEXT: ", cipher.decrypt(ciphertext))
 
+    ciphertext = submit("@admin$true*", key, iv)
+    print("Original Verify:", verify(ciphertext, key, iv))
 
-    modify = attack(ciphertext)
+    # bit flipping attack
+    modified_ciphertext = attack(ciphertext)
 
-    result = verify(modify, key, iv)
-    print("Admin access granted: ", result)
+    # verify tampered
+    is_admin = verify(modified_ciphertext, key, iv)
+
+    print(f"Second Verify after attack: {is_admin}")
+    
